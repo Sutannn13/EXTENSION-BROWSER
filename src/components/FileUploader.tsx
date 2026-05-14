@@ -1,4 +1,5 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
+import type { DragEvent } from 'react';
 import { cn } from '../lib/utils/cn';
 import type { FileUploaderProps } from './types';
 
@@ -21,7 +22,7 @@ export default function FileUploader({ onFileSelect, isLoading = false, accept =
     onFileSelect(file);
   }, [onFileSelect, maxSize, accept]);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];

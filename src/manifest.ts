@@ -1,6 +1,4 @@
-import type { ManifestV3 } from '@crxjs/vite-plugin';
-
-export default function manifest(): ManifestV3 {
+export default function manifest() {
   return {
     manifest_version: 3,
     name: 'EduOverlay AI',

@@ -1,4 +1,4 @@
-import React from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import StudyOverlay from './StudyOverlay';
 import { createOverlayRoot } from './overlayRoot';
@@ -26,9 +26,9 @@ function init(): void {
   const root = createRoot(mountPoint);
 
   root.render(
-    <React.StrictMode>
+    <StrictMode>
       <StudyOverlay />
-    </React.StrictMode>
+    </StrictMode>
   );
 
   chrome.runtime.onMessage.addListener((message) => {

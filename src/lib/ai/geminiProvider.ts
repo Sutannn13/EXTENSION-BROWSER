@@ -3,7 +3,7 @@ import { buildPrompt } from './prompts';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 interface GeminiResponse {
-  candidates?: { content: { parts: { text: string }[] }[] }[];
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
   error?: { message: string };
 }
 
@@ -27,7 +27,9 @@ export async function getGeminiResponse(prompt: string, context: string, apiKey:
   const data: GeminiResponse = await response.json();
 
   if (data.error) throw new Error(`Gemini error: ${data.error.message}`);
-  if (!data.candidates?.[0]?.content?.parts?.[0]?.text) throw new Error('No response from Gemini');
 
-  return data.candidates[0].content.parts[0].text;
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('No response from Gemini');
+
+  return text;
 }
