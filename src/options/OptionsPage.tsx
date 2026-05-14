@@ -8,49 +8,65 @@ interface Settings {
   provider: AIProvider;
   apiKey: string;
   model: string;
-  enableNumberKeyShortcut: boolean;
+  enableNumberOneToggle: boolean;
 }
 
 const PROVIDERS = [
-  { id: 'gemini' as AIProvider, name: 'Google Gemini', description: 'Fast and capable model from Google', defaultModel: 'gemini-1.5-flash' },
+  { id: 'gemini' as AIProvider, name: 'Google Gemini', description: 'Fast and capable model from Google', defaultModel: 'gemini-2.5-flash' },
   { id: 'openai' as AIProvider, name: 'OpenAI', description: 'GPT models from OpenAI', defaultModel: 'gpt-4o-mini' },
   { id: 'anthropic' as AIProvider, name: 'Anthropic Claude', description: 'Claude models from Anthropic', defaultModel: 'claude-3-5-haiku-latest' },
 ];
 
 export default function OptionsPage() {
-  const [settings, setSettings] = useState<Settings>({ provider: 'gemini', apiKey: '', model: 'gemini-1.5-flash', enableNumberKeyShortcut: true });
+  const [settings, setSettings] = useState<Settings>({
+    provider: 'gemini',
+    apiKey: '',
+    model: 'gemini-2.5-flash',
+    enableNumberOneToggle: true
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [showApiKey, setShowApiKey] = useState(false);
 
   useEffect(() => {
-    chrome.storage.local.get(['aiProvider', 'apiKey', 'aiModel', 'enableNumberKeyShortcut'], (result) => {
+    console.log('[EduOverlay] Settings: loading from storage...');
+    chrome.storage.local.get(['aiProvider', 'apiKey', 'aiModel', 'enableNumberOneToggle'], (result) => {
       const provider = (result.aiProvider as AIProvider) || 'gemini';
       const providerConfig = PROVIDERS.find((p) => p.id === provider);
       setSettings({
         provider,
         apiKey: result.apiKey || '',
-        model: result.aiModel || providerConfig?.defaultModel || 'gemini-1.5-flash',
-        enableNumberKeyShortcut: result.enableNumberKeyShortcut !== false,
+        model: result.aiModel || providerConfig?.defaultModel || 'gemini-2.5-flash',
+        enableNumberOneToggle: result.enableNumberOneToggle !== false,
       });
       setIsLoading(false);
+      console.log('[EduOverlay] Settings: loaded, enableNumberOneToggle =', result.enableNumberOneToggle);
     });
   }, []);
 
   const handleProviderChange = useCallback((provider: AIProvider) => {
     const providerConfig = PROVIDERS.find((p) => p.id === provider);
+    console.log('[EduOverlay] Settings: provider changed to', provider);
     setSettings((prev) => ({ ...prev, provider, model: providerConfig?.defaultModel || prev.model }));
   }, []);
 
   const handleSave = useCallback(async () => {
+    console.log('[EduOverlay] Settings: saving...');
     setIsSaving(true);
     setSaveStatus('idle');
     try {
-      await chrome.storage.local.set({ aiProvider: settings.provider, apiKey: settings.apiKey, aiModel: settings.model, enableNumberKeyShortcut: settings.enableNumberKeyShortcut });
+      await chrome.storage.local.set({
+        aiProvider: settings.provider,
+        apiKey: settings.apiKey,
+        aiModel: settings.model,
+        enableNumberOneToggle: settings.enableNumberOneToggle
+      });
+      console.log('[EduOverlay] Settings: saved successfully');
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 3000);
-    } catch {
+    } catch (error) {
+      console.error('[EduOverlay] Settings: save failed', error);
       setSaveStatus('error');
     } finally {
       setIsSaving(false);
@@ -82,6 +98,7 @@ export default function OptionsPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-6">
+        {/* AI Provider Card */}
         <Card variant="default" className="bg-slate-800">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -107,10 +124,15 @@ export default function OptionsPage() {
 
           <div className="mb-6">
             <label className="block text-sm font-medium text-slate-300 mb-2">Model</label>
-            <select value={settings.model} onChange={(e) => setSettings((prev) => ({ ...prev, model: e.target.value }))} className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <select
+              value={settings.model}
+              onChange={(e) => setSettings((prev) => ({ ...prev, model: e.target.value }))}
+              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
               {settings.provider === 'gemini' && <>
-                <option value="gemini-1.5-flash">Gemini 1.5 Flash (Recommended)</option>
-                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
               </>}
               {settings.provider === 'openai' && <>
                 <option value="gpt-4o-mini">GPT-4o Mini (Recommended)</option>
@@ -126,8 +148,18 @@ export default function OptionsPage() {
           <div className="mb-4">
             <label className="block text-sm font-medium text-slate-300 mb-2">API Key</label>
             <div className="relative">
-              <input type={showApiKey ? 'text' : 'password'} value={settings.apiKey} onChange={(e) => setSettings((prev) => ({ ...prev, apiKey: e.target.value }))} placeholder="Enter your API key" className="w-full px-4 py-3 pr-12 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-              <button type="button" onClick={() => setShowApiKey(!showApiKey)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white">
+              <input
+                type={showApiKey ? 'text' : 'password'}
+                value={settings.apiKey}
+                onChange={(e) => setSettings((prev) => ({ ...prev, apiKey: e.target.value }))}
+                placeholder="Enter your API key"
+                className="w-full px-4 py-3 pr-12 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white"
+              >
                 {showApiKey ? (
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
@@ -152,6 +184,7 @@ export default function OptionsPage() {
           </div>
         </Card>
 
+        {/* Keyboard Shortcuts Card */}
         <Card variant="default" className="bg-slate-800">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -172,16 +205,35 @@ export default function OptionsPage() {
             <div className="flex items-center justify-between p-4 bg-slate-700/50 rounded-xl">
               <div>
                 <p className="font-medium">Toggle with Number 1</p>
-                <p className="text-sm text-slate-400">Open overlay by pressing "1" when not typing</p>
+                <p className="text-sm text-slate-400">Open overlay by pressing "1" when not typing in input fields</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" checked={settings.enableNumberKeyShortcut} onChange={(e) => setSettings((prev) => ({ ...prev, enableNumberKeyShortcut: e.target.checked }))} className="sr-only peer" />
+                <input
+                  type="checkbox"
+                  checked={settings.enableNumberOneToggle}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, enableNumberOneToggle: e.target.checked }))}
+                  className="sr-only peer"
+                />
                 <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
               </label>
+            </div>
+
+            <div className="p-4 bg-slate-700/30 rounded-xl border border-slate-600">
+              <div className="flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="text-sm text-slate-300">
+                    <strong>Custom Shortcut:</strong> Untuk mengubah shortcut Alt+1, buka <code className="bg-slate-600 px-1 py-0.5 rounded text-xs">chrome://extensions/shortcuts</code> dan ubah sesuai keinginan.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </Card>
 
+        {/* About Card */}
         <Card variant="default" className="bg-slate-800">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -207,12 +259,19 @@ export default function OptionsPage() {
           </div>
         </Card>
 
+        {/* Save Button */}
         <div className="flex gap-4">
-          <Button variant="primary" onClick={handleSave} disabled={isSaving} className="flex-1">{isSaving ? 'Saving...' : 'Save Settings'}</Button>
+          <Button variant="primary" onClick={handleSave} disabled={isSaving} className="flex-1">
+            {isSaving ? 'Saving...' : 'Save Settings'}
+          </Button>
         </div>
 
-        {saveStatus === 'success' && <p className="text-center text-green-400 text-sm">Settings saved successfully!</p>}
-        {saveStatus === 'error' && <p className="text-center text-red-400 text-sm">Failed to save settings. Please try again.</p>}
+        {saveStatus === 'success' && (
+          <p className="text-center text-green-400 text-sm">Settings saved successfully!</p>
+        )}
+        {saveStatus === 'error' && (
+          <p className="text-center text-red-400 text-sm">Failed to save settings. Please try again.</p>
+        )}
       </main>
     </div>
   );

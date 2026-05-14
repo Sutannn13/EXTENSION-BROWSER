@@ -35,7 +35,7 @@ export default defineConfig({
       name: 'build-manifest',
       apply: 'build',
       generateBundle(_options, _bundle) {
-        // Create the manifest
+        // Inline manifest configuration
         const manifest = {
           manifest_version: 3,
           name: 'EduOverlay AI',
@@ -48,7 +48,7 @@ export default defineConfig({
             '128': 'icons/icon128.png',
           },
           permissions: ['storage', 'activeTab', 'scripting'],
-          host_permissions: ['<all_urls>', 'https://generativelanguage.googleapis.com/*', 'https://api.openai.com/*', 'https://api.anthropic.com/*'],
+          host_permissions: ['<all_urls>'],
           background: {
             service_worker: 'background.js',
             type: 'module',
@@ -58,7 +58,7 @@ export default defineConfig({
               matches: ['<all_urls>'],
               js: ['content.js'],
               css: ['content/content.css'],
-              run_at: 'document_end',
+              run_at: 'document_idle',
             },
           ],
           options_page: 'options.html',
@@ -66,8 +66,12 @@ export default defineConfig({
             'toggle-overlay': {
               suggested_key: {
                 default: 'Alt+1',
+                windows: 'Alt+1',
+                mac: 'Alt+1',
+                chromeos: 'Alt+1',
+                linux: 'Alt+1',
               },
-              description: 'Toggle the study overlay',
+              description: 'Toggle EduOverlay AI overlay',
             },
           },
           web_accessible_resources: [

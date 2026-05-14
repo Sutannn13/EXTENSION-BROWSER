@@ -10,36 +10,31 @@ export default function manifest() {
       '48': 'icons/icon48.png',
       '128': 'icons/icon128.png',
     },
-    permissions: [
-      'storage',
-      'activeTab',
-      'scripting',
-    ],
-    host_permissions: [
-      '<all_urls>',
-      'https://generativelanguage.googleapis.com/*',
-      'https://api.openai.com/*',
-      'https://api.anthropic.com/*',
-    ],
+    permissions: ['storage', 'activeTab', 'scripting'],
+    host_permissions: ['<all_urls>'],
     background: {
-      service_worker: 'background/serviceWorker.js',
+      service_worker: 'background.js',
       type: 'module',
     },
     content_scripts: [
       {
         matches: ['<all_urls>'],
-        js: ['content/content.js'],
+        js: ['content.js'],
         css: ['content/content.css'],
-        run_at: 'document_end',
+        run_at: 'document_idle',
       },
     ],
-    options_page: 'options/options.html',
+    options_page: 'options.html',
     commands: {
       'toggle-overlay': {
         suggested_key: {
           default: 'Alt+1',
+          windows: 'Alt+1',
+          mac: 'Alt+1',
+          chromeos: 'Alt+1',
+          linux: 'Alt+1',
         },
-        description: 'Toggle the study overlay',
+        description: 'Toggle EduOverlay AI overlay',
       },
     },
     web_accessible_resources: [

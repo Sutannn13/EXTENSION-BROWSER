@@ -10,13 +10,29 @@ interface Settings {
   model: string;
 }
 
+// Helper function to check if URL is restricted (internal browser pages)
+function isRestrictedUrl(url: string | undefined): boolean {
+  if (!url) return true;
+  const restrictedPrefixes = [
+    'chrome://',
+    'chrome-extension://',
+    'edge://',
+    'brave://',
+    'about:',
+    'file://',
+    'devtools://',
+  ];
+  return restrictedPrefixes.some(prefix => url.startsWith(prefix));
+}
+
 // Handle messages from content script
 chrome.runtime.onMessage.addListener(
   (request: AIRequest, _sender, sendResponse) => {
+    console.log('[EduOverlay] Background: received message', request.type);
     handleAIRequest(request)
       .then(sendResponse)
       .catch((error) => {
-        console.error('AI request failed:', error);
+        console.error('[EduOverlay] Background: AI request failed:', error);
         sendResponse({ success: false, error: error.message });
       });
     return true;
@@ -104,16 +120,39 @@ function getDefaultModel(provider?: string): string {
       return 'claude-3-5-haiku-latest';
     case 'gemini':
     default:
-      return 'gemini-1.5-flash';
+      return 'gemini-2.5-flash';
   }
 }
 
-chrome.commands.onCommand.addListener((command) => {
-  if (command === 'toggle-overlay') {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: 'TOGGLE_OVERLAY' });
-      }
-    });
+// Handle keyboard command from manifest
+chrome.commands.onCommand.addListener(async (command) => {
+  console.log('[EduOverlay] Background: received command', command);
+
+  if (command !== 'toggle-overlay') return;
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab?.id || !tab.url) {
+      console.warn('[EduOverlay] Background: no active tab or URL');
+      return;
+    }
+
+    // Check for restricted URLs
+    if (isRestrictedUrl(tab.url)) {
+      console.warn('[EduOverlay] Background: blocked on restricted URL:', tab.url);
+      return;
+    }
+
+    console.log('[EduOverlay] Background: sending toggle to tab', tab.id, tab.url);
+
+    // Send message to content script
+    await chrome.tabs.sendMessage(tab.id, { type: 'EDUOVERLAY_TOGGLE' });
+    console.log('[EduOverlay] Background: toggle message sent successfully');
+  } catch (error) {
+    console.warn('[EduOverlay] Background: failed to send message, content script may not be ready:', error);
+    // Don't crash - content script might not be ready yet
   }
 });
+
+console.log('[EduOverlay] Background: service worker initialized');

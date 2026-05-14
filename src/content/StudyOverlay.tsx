@@ -36,21 +36,56 @@ export default function StudyOverlay() {
   const [error, setError] = useState<string | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  // Page classification on mount
   useEffect(() => {
+    console.log('[EduOverlay] Classifying page...');
     const classification = classifyPage({
       url: window.location.href,
       title: document.title,
       headings: Array.from(document.querySelectorAll('h1, h2, h3')).map((el) => el.textContent || ''),
     });
     setPageClassification(classification);
+
+    if (classification.isRestricted) {
+      console.log('[EduOverlay] Restricted page detected:', classification.matchedKeywords);
+    } else {
+      console.log('[EduOverlay] Normal page - overlay is active');
+    }
   }, []);
 
+  // Listen for toggle events from content script
   useEffect(() => {
-    const handleToggle = () => setIsOpen((prev) => !prev);
-    window.addEventListener('eduoverlay-toggle', handleToggle);
-    return () => window.removeEventListener('eduoverlay-toggle', handleToggle);
+    const handleToggle = () => {
+      console.log('[EduOverlay] Toggle event received');
+      setIsOpen((prev) => {
+        const newState = !prev;
+        console.log('[EduOverlay] Overlay state changed to:', newState ? 'open' : 'closed');
+        return newState;
+      });
+    };
+
+    const handleOpen = () => {
+      console.log('[EduOverlay] Open event received');
+      setIsOpen(true);
+    };
+
+    const handleClose = () => {
+      console.log('[EduOverlay] Close event received');
+      setIsOpen(false);
+    };
+
+    window.addEventListener('eduoverlay:toggle', handleToggle);
+    window.addEventListener('eduoverlay:open', handleOpen);
+    window.addEventListener('eduoverlay:close', handleClose);
+
+    return () => {
+      window.removeEventListener('eduoverlay:toggle', handleToggle);
+      window.removeEventListener('eduoverlay:open', handleOpen);
+      window.removeEventListener('eduoverlay:close', handleClose);
+    };
   }, []);
 
+  // Auto-scroll chat container
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -72,25 +107,29 @@ export default function StudyOverlay() {
       }
       const text = await parseFile(file);
       if (!text || text.trim().length === 0) {
-        throw new Error('File appears to be empty or unreadable');
+        throw new Error('File appears to be empty or unreadable. PDF ini kemungkinan hasil scan/gambar.');
       }
       const chunks = chunkText(text);
       if (chunks.length === 0) {
         throw new Error('Failed to process file content');
       }
+      console.log('[EduOverlay] File parsed:', file.name, '-', text.length, 'characters,', chunks.length, 'chunks');
       setUploadedFile({ name: file.name, size: file.size, chunks });
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: `File "${file.name}" berhasil diunggah. Saya sudah memproses ${chunks.length} bagian materi.`, timestamp: Date.now() },
+        { role: 'assistant', content: `File "${file.name}" berhasil diunggah. Saya sudah memproses ${chunks.length} bagian materi (${text.length} karakter).`, timestamp: Date.now() },
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memproses file');
+      const errorMsg = err instanceof Error ? err.message : 'Gagal memproses file';
+      console.error('[EduOverlay] File upload error:', errorMsg);
+      setError(errorMsg);
     } finally {
       setIsParsing(false);
     }
   }, []);
 
   const handleFileDelete = useCallback(() => {
+    console.log('[EduOverlay] Deleting uploaded file');
     setUploadedFile(null);
     setMessages([]);
     setError(null);
@@ -125,6 +164,7 @@ export default function StudyOverlay() {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Terjadi kesalahan';
+      console.error('[EduOverlay] Send message error:', errorMessage);
       setError(errorMessage);
       setMessages((prev) => [...prev, { role: 'assistant', content: `Maaf, terjadi kesalahan: ${errorMessage}`, timestamp: Date.now() }]);
     } finally {
@@ -137,14 +177,21 @@ export default function StudyOverlay() {
   }, []);
 
   const handleClearChat = useCallback(() => {
+    console.log('[EduOverlay] Clearing chat');
     setMessages([]);
     setError(null);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    console.log('[EduOverlay] Close button clicked');
+    setIsOpen(false);
   }, []);
 
   const isRestrictedPage = pageClassification?.isRestricted ?? false;
 
   return (
     <>
+      {/* Floating Button */}
       <button
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
@@ -169,14 +216,16 @@ export default function StudyOverlay() {
         )}
       </button>
 
+      {/* Overlay Panel */}
       <div className={cn(
         'fixed bottom-6 right-6 z-[2147483647]',
         'w-[420px] max-w-[calc(100vw-32px)] max-h-[80vh]',
         'bg-slate-900 rounded-2xl shadow-2xl',
         'flex flex-col overflow-hidden',
         'transition-all duration-300',
-        isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+        isOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
       )}>
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
@@ -190,18 +239,33 @@ export default function StudyOverlay() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => window.open(chrome.runtime.getURL('options/options.html'), '_blank')} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors" aria-label="Settings">
+            <button
+              onClick={() => window.open(chrome.runtime.getURL('options/options.html'), '_blank')}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+              aria-label="Settings"
+              title="Settings"
+            >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </button>
-            <button onClick={() => setIsMinimized(!isMinimized)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors" aria-label="Minimize">
+            <button
+              onClick={() => setIsMinimized(!isMinimized)}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+              aria-label={isMinimized ? 'Expand' : 'Minimize'}
+              title={isMinimized ? 'Expand' : 'Minimize'}
+            >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
               </svg>
             </button>
-            <button onClick={() => setIsOpen(false)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors" aria-label="Close">
+            <button
+              onClick={handleClose}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+              aria-label="Close EduOverlay AI"
+              title="Close"
+            >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -209,13 +273,16 @@ export default function StudyOverlay() {
           </div>
         </div>
 
+        {/* Content */}
         {!isMinimized && (
           <>
+            {/* Safety Banner for restricted pages */}
             {isRestrictedPage && (
               <SafetyBanner message="EduOverlay AI dinonaktifkan di halaman evaluasi/ujian untuk menjaga integritas akademik." />
             )}
 
             <div className="flex-1 overflow-hidden flex flex-col">
+              {/* File Upload Section */}
               {!isRestrictedPage && (
                 <div className="p-4 border-b border-slate-700">
                   {uploadedFile ? (
@@ -232,7 +299,12 @@ export default function StudyOverlay() {
                             <p className="text-xs text-slate-400">{(uploadedFile.size / 1024).toFixed(1)} KB • {uploadedFile.chunks.length} chunks</p>
                           </div>
                         </div>
-                        <button onClick={handleFileDelete} className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors flex-shrink-0" aria-label="Delete file">
+                        <button
+                          onClick={handleFileDelete}
+                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors flex-shrink-0"
+                          aria-label="Delete file"
+                          title="Hapus file"
+                        >
                           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
@@ -245,6 +317,7 @@ export default function StudyOverlay() {
                 </div>
               )}
 
+              {/* Quick Prompts */}
               {!isRestrictedPage && uploadedFile && (
                 <div className="px-4 py-2 border-b border-slate-700">
                   <p className="text-xs text-slate-400 mb-2">Mode Belajar:</p>
@@ -258,6 +331,7 @@ export default function StudyOverlay() {
                 </div>
               )}
 
+              {/* Chat Messages */}
               {!isRestrictedPage && (
                 <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
                   {messages.length === 0 ? (
@@ -276,10 +350,19 @@ export default function StudyOverlay() {
                 </div>
               )}
 
+              {/* Input Area */}
               {!isRestrictedPage && (
                 <div className="p-4 border-t border-slate-700">
                   <div className="flex gap-2">
-                    <Textarea value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder="Ajukan pertanyaan tentang materi..." disabled={!uploadedFile || isLoading} className="flex-1" rows={1} />
+                    <Textarea
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                      placeholder="Ajukan pertanyaan tentang materi..."
+                      disabled={!uploadedFile || isLoading}
+                      className="flex-1"
+                      rows={1}
+                    />
                     <Button onClick={handleSendMessage} disabled={!inputValue.trim() || !uploadedFile || isLoading} variant="primary" className="px-4">
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
