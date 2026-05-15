@@ -49,9 +49,8 @@ function init(): void {
 
 // Listen for messages from background service worker
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  console.log('[EduOverlay] Content script received message:', message.type);
-
   if (message?.type === 'EDUOVERLAY_TOGGLE') {
+    console.log('[EduOverlay] Content script received toggle message');
     console.log('[EduOverlay] Dispatching toggle event');
     window.dispatchEvent(new CustomEvent('eduoverlay:toggle'));
     sendResponse({ ok: true });
@@ -73,8 +72,7 @@ document.addEventListener('keydown', (event) => {
 
   // Number 1 toggle (only when not in input field)
   if (event.key === '1' && !event.altKey && !event.ctrlKey && !event.metaKey) {
-    const activeElement = document.activeElement;
-    const isTyping = isTypingTarget(activeElement);
+    const isTyping = isTypingTarget(event.target) || isTypingTarget(document.activeElement);
 
     if (isTyping) {
       console.log('[EduOverlay] Number 1 pressed but user is typing, ignoring');

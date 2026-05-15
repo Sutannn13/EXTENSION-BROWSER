@@ -1,6 +1,17 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import { WorkerMessageHandler } from 'pdfjs-dist/build/pdf.worker.mjs';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+globalThis.pdfjsWorker = { WorkerMessageHandler };
+
+function getPdfWorkerUrl(): string {
+  if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
+    return chrome.runtime.getURL('pdf.worker.min.mjs');
+  }
+
+  return '/pdf.worker.min.mjs';
+}
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = getPdfWorkerUrl();
 
 export async function parsePdf(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();

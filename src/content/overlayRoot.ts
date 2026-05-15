@@ -1,18 +1,25 @@
+const OVERLAY_ROOT_ID = 'eduoverlay-ai-root';
+
 export function createOverlayRoot(): HTMLElement | null {
-  const existingRoot = document.getElementById('eduoverlay-root');
+  const existingRoot = document.getElementById(OVERLAY_ROOT_ID);
   if (existingRoot) {
     return existingRoot;
   }
 
   const container = document.createElement('div');
-  container.id = 'eduoverlay-root';
+  container.id = OVERLAY_ROOT_ID;
 
   const shadow = container.attachShadow({ mode: 'open' });
 
+  if (typeof chrome !== 'undefined' && chrome.runtime?.getURL) {
+    const stylesheet = document.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = chrome.runtime.getURL('content/content.css');
+    shadow.appendChild(stylesheet);
+  }
+
   const style = document.createElement('style');
   style.textContent = `
-    @import 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
-
     * {
       box-sizing: border-box;
       margin: 0;
@@ -52,7 +59,7 @@ export function createOverlayRoot(): HTMLElement | null {
 }
 
 export function removeOverlayRoot(): void {
-  const root = document.getElementById('eduoverlay-root');
+  const root = document.getElementById(OVERLAY_ROOT_ID);
   if (root) {
     root.remove();
   }

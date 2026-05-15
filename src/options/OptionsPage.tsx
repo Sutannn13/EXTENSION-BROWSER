@@ -31,13 +31,13 @@ export default function OptionsPage() {
 
   useEffect(() => {
     console.log('[EduOverlay] Settings: loading from storage...');
-    chrome.storage.local.get(['aiProvider', 'apiKey', 'aiModel', 'enableNumberOneToggle'], (result) => {
-      const provider = (result.aiProvider as AIProvider) || 'gemini';
+    chrome.storage.local.get(['provider', 'aiProvider', 'apiKey', 'model', 'aiModel', 'enableNumberOneToggle'], (result) => {
+      const provider = ((result.provider || result.aiProvider) as AIProvider) || 'gemini';
       const providerConfig = PROVIDERS.find((p) => p.id === provider);
       setSettings({
         provider,
         apiKey: result.apiKey || '',
-        model: result.aiModel || providerConfig?.defaultModel || 'gemini-2.5-flash',
+        model: result.model || result.aiModel || providerConfig?.defaultModel || 'gemini-2.5-flash',
         enableNumberOneToggle: result.enableNumberOneToggle !== false,
       });
       setIsLoading(false);
@@ -57,6 +57,8 @@ export default function OptionsPage() {
     setSaveStatus('idle');
     try {
       await chrome.storage.local.set({
+        provider: settings.provider,
+        model: settings.model,
         aiProvider: settings.provider,
         apiKey: settings.apiKey,
         aiModel: settings.model,

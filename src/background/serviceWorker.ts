@@ -10,6 +10,12 @@ interface Settings {
   model: string;
 }
 
+interface OpenOptionsRequest {
+  type: 'OPEN_OPTIONS';
+}
+
+type RuntimeRequest = AIRequest | OpenOptionsRequest;
+
 // Helper function to check if URL is restricted (internal browser pages)
 function isRestrictedUrl(url: string | undefined): boolean {
   if (!url) return true;
@@ -27,8 +33,24 @@ function isRestrictedUrl(url: string | undefined): boolean {
 
 // Handle messages from content script
 chrome.runtime.onMessage.addListener(
-  (request: AIRequest, _sender, sendResponse) => {
+  (request: RuntimeRequest, _sender, sendResponse) => {
     console.log('[EduOverlay] Background: received message', request.type);
+
+    if (request.type === 'OPEN_OPTIONS') {
+      chrome.runtime.openOptionsPage(() => {
+        const error = chrome.runtime.lastError;
+        if (error) {
+          console.error('[EduOverlay] Background: failed to open options page:', error.message);
+          sendResponse({ success: false, error: error.message });
+          return;
+        }
+
+        sendResponse({ success: true });
+      });
+
+      return true;
+    }
+
     handleAIRequest(request)
       .then(sendResponse)
       .catch((error) => {
@@ -98,14 +120,16 @@ async function handleAIRequest(request: AIRequest): Promise<AIResponse> {
 async function getSettings(): Promise<Settings> {
   return new Promise((resolve) => {
     chrome.storage.local.get(
-      ['aiProvider', 'apiKey', 'aiModel'],
+      ['provider', 'aiProvider', 'apiKey', 'model', 'aiModel'],
       (result) => {
+        const provider = ((result.provider || result.aiProvider) as Settings['provider']) || 'gemini';
         resolve({
-          provider: (result.aiProvider as Settings['provider']) || 'gemini',
+          provider,
           apiKey: result.apiKey || '',
           model:
+            result.model ||
             result.aiModel ||
-            getDefaultModel(result.aiProvider as Settings['provider']),
+            getDefaultModel(provider),
         });
       }
     );

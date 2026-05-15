@@ -39,7 +39,7 @@ export default function manifest() {
     },
     web_accessible_resources: [
       {
-        resources: ['content/content.css'],
+        resources: ['content/content.css', 'pdf.worker.min.mjs'],
         matches: ['<all_urls>'],
       },
     ],

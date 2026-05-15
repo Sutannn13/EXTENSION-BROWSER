@@ -6,7 +6,10 @@
   "description": "AI study overlay for learning forums - helps students learn from uploaded materials",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:app && npm run build:content && npm run build:content-css",
+    "build:app": "vite build",
+    "build:content": "vite build --config vite.content.config.ts",
+    "build:content-css": "tailwindcss -c ./tailwind.content.config.js -i ./src/content/content.css -o ./dist/content/content.css --minify",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",

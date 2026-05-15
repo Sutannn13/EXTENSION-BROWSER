@@ -182,6 +182,15 @@ export default function StudyOverlay() {
     setError(null);
   }, []);
 
+  const handleOpenSettings = useCallback(() => {
+    chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS' }, (response) => {
+      const error = chrome.runtime.lastError;
+      if (error || !response?.success) {
+        console.error('[EduOverlay] Failed to open settings:', error?.message || response?.error || 'Unknown error');
+      }
+    });
+  }, []);
+
   const handleClose = useCallback(() => {
     console.log('[EduOverlay] Close button clicked');
     setIsOpen(false);
@@ -240,7 +249,7 @@ export default function StudyOverlay() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => window.open(chrome.runtime.getURL('options/options.html'), '_blank')}
+              onClick={handleOpenSettings}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
               aria-label="Settings"
               title="Settings"
